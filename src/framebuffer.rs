@@ -3,6 +3,7 @@ use raylib::prelude::*;
 
 pub struct Framebuffer {
     image: Image,
+    texture: Option<Texture2D>,
     width: i32,
     height: i32,
     background_color: Color,
@@ -17,6 +18,7 @@ impl Framebuffer {
 
         Self {
             image,
+            texture: None,
             width,
             height,
             background_color,
@@ -78,24 +80,46 @@ impl Framebuffer {
         println!("Proceso de exportación terminado: {}", file_name);
     }
 
-    pub fn swap_buffers(&self, window: &mut RaylibHandle, raylib_thread: &RaylibThread) {
-        let texture_result = window.load_texture_from_image(raylib_thread, &self.image);
+    pub fn swap_buffers(
+        &mut self,
+        window: &mut RaylibHandle,
+        raylib_thread: &RaylibThread,
+        update_texture: bool,
+    ) {
+        if self.texture.is_none() {
+            match window.load_texture_from_image(raylib_thread, &self.image) {
+                Ok(texture) => self.texture = Some(texture),
+                Err(error) => {
+                    eprintln!(
+                        "No se pudo cargar el framebuffer en la ventana: {:?}",
+                        error
+                    );
+                    return;
+                }
+            }
+        }
 
-        match texture_result {
-            Ok(texture) => {
-                let mut renderer = window.begin_drawing(raylib_thread);
+        if let Some(texture) = self.texture.as_mut() {
+            if update_texture {
+                let pixels = self.image.get_image_data();
+                let bytes = unsafe {
+                    std::slice::from_raw_parts(
+                        pixels.as_ptr() as *const u8,
+                        pixels.len() * std::mem::size_of::<Color>(),
+                    )
+                };
 
-                renderer.clear_background(self.background_color);
-
-                renderer.draw_texture(&texture, 0, 0, Color::WHITE);
+                if let Err(error) = texture.update_texture(bytes) {
+                    eprintln!(
+                        "No se pudo actualizar el framebuffer en la ventana: {:?}",
+                        error
+                    );
+                }
             }
 
-            Err(error) => {
-                eprintln!(
-                    "No se pudo cargar el framebuffer en la ventana: {:?}",
-                    error
-                );
-            }
+            let mut renderer = window.begin_drawing(raylib_thread);
+            renderer.clear_background(self.background_color);
+            renderer.draw_texture(texture, 0, 0, Color::WHITE);
         }
     }
 }
