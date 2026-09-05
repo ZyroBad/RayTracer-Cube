@@ -5,18 +5,46 @@ use crate::ray_intersect::{Ray, Vec3};
 pub struct Cube {
     pub min: Vec3,
     pub max: Vec3,
-    pub color: Color,
+    pub texture_a: Color,
+    pub texture_b: Color,
+    pub texture_scale: f32,
 }
 
 impl Cube {
-    pub fn new(center: Vec3, size: f32, color: Color) -> Self {
+    pub fn new(
+        center: Vec3,
+        size: f32,
+        texture_a: Color,
+        texture_b: Color,
+    ) -> Self {
         let half_size = size * 0.5;
         let offset = Vec3::new(half_size, half_size, half_size);
 
         Self {
             min: center - offset,
             max: center + offset,
-            color,
+            texture_a,
+            texture_b,
+            texture_scale: 8.0,
+        }
+    }
+
+    pub fn texture_color(&self, point: Vec3, normal: Vec3) -> Color {
+        let (u, v) = if normal.x.abs() > 0.5 {
+            (point.z, point.y)
+        } else if normal.y.abs() > 0.5 {
+            (point.x, point.z)
+        } else {
+            (point.x, point.y)
+        };
+
+        let tile_u = ((u - self.min.x) * self.texture_scale).floor() as i32;
+        let tile_v = ((v - self.min.y) * self.texture_scale).floor() as i32;
+
+        if (tile_u + tile_v) % 2 == 0 {
+            self.texture_a
+        } else {
+            self.texture_b
         }
     }
 

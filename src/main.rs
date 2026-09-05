@@ -11,7 +11,8 @@ fn render_cube(framebuffer: &mut Framebuffer) {
     let cube = Cube::new(
         Vec3::new(0.0, 0.0, 0.0),
         1.2,
-        Color::new(230, 45, 55, 255),
+        Color::new(235, 235, 235, 255),
+        Color::new(35, 75, 135, 255),
     );
     let light_position = Vec3::new(-1.5, 1.8, 2.5);
     let camera_origin = Vec3::new(2.8, 1.8, 6.0);
@@ -31,10 +32,11 @@ fn render_cube(framebuffer: &mut Framebuffer) {
                 let hit_point = ray.origin + ray.direction * t;
                 let light_direction = (light_position - hit_point).normalize();
                 let diffuse = normal.dot(light_direction).max(0.15);
+                let texture_color = cube.texture_color(hit_point, normal);
 
-                let red = cube.color.r as f32 * diffuse;
-                let green = cube.color.g as f32 * diffuse;
-                let blue = cube.color.b as f32 * diffuse;
+                let red = texture_color.r as f32 * diffuse;
+                let green = texture_color.g as f32 * diffuse;
+                let blue = texture_color.b as f32 * diffuse;
 
                 framebuffer.set_current_color(Color::new(
                     red.clamp(0.0, 255.0) as u8,
@@ -57,7 +59,7 @@ fn main() {
 
     let (mut window, raylib_thread) = raylib::init()
         .size(window_width, window_height)
-        .title("Raytracing difuso: cubo")
+        .title("Raytracing difuso: cubo texturizado")
         .resizable()
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
