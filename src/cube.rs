@@ -48,6 +48,34 @@ impl Cube {
         }
     }
 
+    pub fn texture_color_at(&self, point: Vec3, normal: Vec3) -> Color {
+        let band = 0.26;
+        let height = self.max.y - self.min.y;
+
+        if point.y > self.max.y - band * height || point.y < self.min.y + band * height {
+            return if ((point.x * self.texture_scale).floor()
+                + (point.z * self.texture_scale).floor()) as i32
+                % 2
+                == 0
+            {
+                Color::new(190, 34, 25, 255)
+            } else {
+                Color::new(110, 20, 18, 255)
+            };
+        }
+
+        if normal.y.abs() < 0.5 {
+            let stripe = ((point.x + point.z) * self.texture_scale).floor() as i32;
+            return if stripe % 2 == 0 {
+                Color::new(220, 220, 215, 255)
+            } else {
+                Color::new(55, 60, 72, 255)
+            };
+        }
+
+        self.texture_color(point, normal)
+    }
+
     pub fn intersect(&self, ray: &Ray) -> Option<(f32, Vec3)> {
         let mut near = 0.001;
         let mut far = f32::INFINITY;

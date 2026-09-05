@@ -7,7 +7,37 @@ use framebuffer::Framebuffer;
 use ray_intersect::{Ray, Vec3};
 use raylib::prelude::*;
 
-fn render_cube(framebuffer: &mut Framebuffer) {
+fn rotate_x(vector: Vec3, angle: f32) -> Vec3 {
+    let (sin, cos) = angle.sin_cos();
+    Vec3::new(
+        vector.x,
+        vector.y * cos - vector.z * sin,
+        vector.y * sin + vector.z * cos,
+    )
+}
+
+fn rotate_y(vector: Vec3, angle: f32) -> Vec3 {
+    let (sin, cos) = angle.sin_cos();
+    Vec3::new(
+        vector.x * cos + vector.z * sin,
+        vector.y,
+        -vector.x * sin + vector.z * cos,
+    )
+}
+
+fn rotate_cube_to_world(vector: Vec3, rotation_x: f32, rotation_y: f32) -> Vec3 {
+    rotate_y(rotate_x(vector, rotation_x), rotation_y)
+}
+
+fn rotate_world_to_cube(vector: Vec3, rotation_x: f32, rotation_y: f32) -> Vec3 {
+    rotate_x(rotate_y(vector, -rotation_y), -rotation_x)
+}
+
+fn render_cube(
+    framebuffer: &mut Framebuffer,
+    rotation_x: f32,
+    rotation_y: f32,
+) {
     let cube = Cube::new(
         Vec3::new(0.0, 0.0, 0.0),
         1.2,
@@ -26,13 +56,17 @@ fn render_cube(framebuffer: &mut Framebuffer) {
 
             let screen_point = Vec3::new(ndc_x * aspect, ndc_y, 0.0);
             let ray_dir = (screen_point - camera_origin).normalize();
-            let ray = Ray::new(camera_origin, ray_dir);
+            let local_origin = rotate_world_to_cube(camera_origin, rotation_x, rotation_y);
+            let local_direction = rotate_world_to_cube(ray_dir, rotation_x, rotation_y);
+            let ray = Ray::new(local_origin, local_direction);
 
             if let Some((t, normal)) = cube.intersect(&ray) {
-                let hit_point = ray.origin + ray.direction * t;
+                let local_hit_point = ray.origin + ray.direction * t;
+                let hit_point = rotate_cube_to_world(local_hit_point, rotation_x, rotation_y);
+                let world_normal = rotate_cube_to_world(normal, rotation_x, rotation_y).normalize();
                 let light_direction = (light_position - hit_point).normalize();
-                let diffuse = normal.dot(light_direction).max(0.15);
-                let texture_color = cube.texture_color(hit_point, normal);
+                let diffuse = world_normal.dot(light_direction).max(0.15);
+                let texture_color = cube.texture_color_at(local_hit_point, normal);
 
                 let red = texture_color.r as f32 * diffuse;
                 let green = texture_color.g as f32 * diffuse;
@@ -70,6 +104,9 @@ fn main() {
     framebuffer.set_background_color(Color::BLACK);
     framebuffer.clear();
 
+    let mut rotation_x = -0.12;
+    let mut rotation_y = 0.0;
+
     while !window.window_should_close() {
         let current_width = window.get_screen_width();
         let current_height = window.get_screen_height();
@@ -81,7 +118,14 @@ fn main() {
                 framebuffer.clear();
             }
 
-            render_cube(&mut framebuffer);
+            if window.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
+                let mouse_delta = window.get_mouse_delta();
+                rotation_y += mouse_delta.x * 0.01;
+                rotation_x += mouse_delta.y * 0.01;
+                rotation_x = rotation_x.clamp(-1.3, 1.3);
+            }
+
+            render_cube(&mut framebuffer, rotation_x, rotation_y);
             framebuffer.swap_buffers(&mut window, &raylib_thread);
         } else {
             std::thread::sleep(std::time::Duration::from_millis(16));
